@@ -1,5 +1,42 @@
 # Changelog
 
+## 3.0.0
+
+* Updated to [flutter_map](https://pub.dev/packages/flutter_map) v4
+
+## 3.0.0-dev.4
+
+* Fixed Polygon and multipolygon name issue
+
+## 3.0.0-dev.3
+
+* Throw a `MarkerException` if a named marker is not found
+
+### Breaking Changes
+
+* Removed `NotImplementedException` class (use `UnimplementedError` instead)
+
+## 3.0.0-dev.2
+
+* Updated `README.md` to reflect the new API
+* Exposed `exceptions.dart` file
+* Fixed [#3](https://github.com/TesteurManiak/map_controller_plus/issues/3)
+
+## 3.0.0-dev.1
+
+* Removed [rxdart](https://pub.dev/packages/rxdart) dependency
+* Cleaned and simplified the code of the package (check the breaking changes for more details)
+
+### Breaking Changes
+
+* Removed `TileLayerType` enum
+* Removed `TileLayersBar`, `MapTileLayerNormal`, `MapTileLayerMonochrome`, `MapTileLayerTopography`, `MapTileLayerHike`, `MapTileLayerCustom` widget
+* Removed `TileLayerState` class
+* Removed `StatefulMapController.tileLayerType` property
+* Removed `StatefulMapController.customTileLayer` property
+* Removed `StatefulMapController.tileLayer` property
+* Removed `StatefulMapController.switchTileLayer` method
+
 ## 2.0.0
 
 ### Breaking Changes

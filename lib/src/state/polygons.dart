@@ -3,9 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geojson/geojson.dart';
 import 'package:geopoint/geopoint.dart';
 import 'package:latlong2/latlong.dart';
-
-import '../controller.dart';
-import '../models.dart';
+import 'package:map_controller_plus/src/controller.dart';
+import 'package:map_controller_plus/src/models.dart';
 
 /// State of the polygons on the map
 class PolygonsState {
@@ -15,7 +14,7 @@ class PolygonsState {
   /// The notify function
   final FeedNotifyFunction notify;
 
-  final Map<String, Polygon> _namedPolygons = {};
+  final _namedPolygons = <String, Polygon>{};
 
   /// The named polygons on the map
   Map<String, Polygon> get namedPolygons => _namedPolygons;
@@ -72,15 +71,14 @@ class PolygonsState {
   /// Export all polygons to a [GeoJsonFeature] with geometry
   /// type [GeoJsonMultiPolygon]
   GeoJsonFeature<GeoJsonMultiPolygon>? toGeoJsonFeatures() {
-    if (namedPolygons.isEmpty) {
-      return null;
-    }
+    if (namedPolygons.isEmpty) return null;
+
     final multiPolygon = GeoJsonMultiPolygon(name: "map_polygons");
-    for (final k in namedPolygons.keys) {
-      final mapPolygon = namedPolygons[k]!;
-      final polygon = GeoJsonPolygon()..name = k;
-      final geoSerie =
-          GeoSerie(name: polygon.name!, type: GeoSerieType.polygon);
+    for (final entry in namedPolygons.entries) {
+      final mapPolygon = entry.value;
+      final polygon = GeoJsonPolygon()..name = entry.key;
+      final geoSerie = GeoSerie(name: entry.key, type: GeoSerieType.polygon);
+
       for (final point in mapPolygon.points) {
         geoSerie.geoPoints.add(
           GeoPoint(latitude: point.latitude, longitude: point.longitude),

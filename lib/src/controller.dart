@@ -6,16 +6,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geojson/geojson.dart';
 import 'package:geopoint/geopoint.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:rxdart/rxdart.dart';
-
-import '../map_controller_plus.dart';
-import 'exceptions.dart';
-import 'state/lines.dart';
-import 'state/map.dart';
-import 'state/markers.dart';
-import 'state/polygons.dart';
-import 'state/stateful_markers.dart';
-import 'state/tile_layer.dart';
+import 'package:map_controller_plus/src/models.dart';
+import 'package:map_controller_plus/src/state/lines.dart';
+import 'package:map_controller_plus/src/state/map.dart';
+import 'package:map_controller_plus/src/state/markers.dart';
+import 'package:map_controller_plus/src/state/polygons.dart';
+import 'package:map_controller_plus/src/state/stateful_markers.dart';
+import 'package:uuid/uuid.dart';
 
 /// Function to notify the changefeed
 typedef FeedNotifyFunction = void Function(
@@ -30,8 +27,6 @@ class StatefulMapController {
   /// Provide a Flutter map [MapController]
   StatefulMapController({
     required this.mapController,
-    this.tileLayerType = TileLayerType.normal,
-    this.customTileLayer,
     this.verbose = false,
   }) {
     // init state
@@ -39,14 +34,8 @@ class StatefulMapController {
     _linesState = LinesState(notify: notify);
     _polygonsState = PolygonsState(notify: notify);
     _mapState = MapState(mapController: mapController, notify: notify);
-    _statefulMarkersState =
-        StatefulMarkersState(mapController: mapController, notify: notify);
-    if (customTileLayer != null) {
-      tileLayerType = TileLayerType.custom;
-    }
-    _tileLayerState = TileLayerState(
-      type: tileLayerType,
-      customTileLayer: customTileLayer,
+    _statefulMarkersState = StatefulMarkersState(
+      mapController: mapController,
       notify: notify,
     );
   }
@@ -57,12 +46,6 @@ class StatefulMapController {
   /// The Flutter Map [MapOptions]
   MapOptions? mapOptions;
 
-  /// The initial tile layer
-  TileLayerType tileLayerType;
-
-  /// A custom tile layer options
-  TileLayer? customTileLayer;
-
   /// Verbosity level
   final bool verbose;
 
@@ -70,14 +53,13 @@ class StatefulMapController {
   late MarkersState _markersState;
   late LinesState _linesState;
   late PolygonsState _polygonsState;
-  late TileLayerState _tileLayerState;
   late StatefulMarkersState _statefulMarkersState;
 
-  final _subject = PublishSubject<StatefulMapControllerStateChange>();
+  final _subject =
+      StreamController<StatefulMapControllerStateChange>.broadcast();
 
   /// A stream with changes occuring on the map
-  Stream<StatefulMapControllerStateChange> get changeFeed =>
-      _subject.distinct();
+  Stream<StatefulMapControllerStateChange> get changeFeed => _subject.stream;
 
   /// The map zoom value
   double get zoom => mapController.zoom;
@@ -110,10 +92,10 @@ class StatefulMapController {
 
   /// The markers present on the map
   List<Marker> get markers {
-    final localMarkers = <Marker>[];
-    localMarkers
-      ..addAll(_markersState.markers)
-      ..addAll(_statefulMarkersState.markers);
+    final localMarkers = <Marker>[
+      ..._markersState.markers,
+      ..._statefulMarkersState.markers
+    ];
     return localMarkers;
   }
 
@@ -174,9 +156,6 @@ class StatefulMapController {
   /// The named polygons present on the map
   Map<String, Polygon> get namedPolygons => _polygonsState.namedPolygons;
 
-  /// The current map tile layer
-  TileLayer? get tileLayer => _tileLayerState.tileLayer;
-
   /// Zoom in one level
   void zoomIn() => _mapState.zoomIn();
 
@@ -218,10 +197,7 @@ class StatefulMapController {
   /// Fit bounds and zoom the map to center on a line
   void fitLine(String name) {
     final line = _linesState.namedLines[name]!;
-    final bounds = LatLngBounds();
-    for (final point in line.points) {
-      bounds.extend(point);
-    }
+    final bounds = LatLngBounds.fromPoints(line.points);
     mapController.fitBounds(bounds);
   }
 
@@ -300,10 +276,6 @@ class StatefulMapController {
         borderColor: borderColor,
       );
 
-  /// Switch to a tile layer
-  void switchTileLayer(TileLayerType layer) =>
-      _tileLayerState.switchTileLayer(layer);
-
   /// Display some geojson data on the map
   Future<void> fromGeoJson(
     String data, {
@@ -316,7 +288,7 @@ class StatefulMapController {
     }
 
     final geojson = GeoJson();
-    geojson.processedFeatures.listen((GeoJsonFeature feature) {
+    geojson.processedFeatures.listen((GeoJsonFeature<dynamic> feature) {
       switch (feature.type) {
         case GeoJsonFeatureType.point:
           final point = feature.geometry as GeoJsonPoint;
@@ -371,21 +343,25 @@ class StatefulMapController {
         case GeoJsonFeatureType.polygon:
           final poly = feature.geometry as GeoJsonPolygon;
           for (final geoSerie in poly.geoSeries) {
-            addPolygon(name: geoSerie.name, points: geoSerie.toLatLng());
+            final name =
+                geoSerie.name.isEmpty ? const Uuid().v4() : geoSerie.name;
+            addPolygon(name: name, points: geoSerie.toLatLng());
           }
           break;
         case GeoJsonFeatureType.multipolygon:
           final mp = feature.geometry as GeoJsonMultiPolygon;
           for (final poly in mp.polygons) {
             for (final geoSerie in poly.geoSeries) {
-              addPolygon(name: geoSerie.name, points: geoSerie.toLatLng());
+              final name =
+                  geoSerie.name.isEmpty ? const Uuid().v4() : geoSerie.name;
+              addPolygon(name: name, points: geoSerie.toLatLng());
             }
           }
           break;
         case GeoJsonFeatureType.geometryCollection:
           // TODO : implement
-          throw const NotImplementedException(
-            "GeoJsonFeatureType.geometryCollection Not implemented",
+          throw UnimplementedError(
+            "GeoJsonFeatureType.geometryCollection not implemented",
           );
       }
     });
@@ -398,8 +374,7 @@ class StatefulMapController {
 
   /// Export all the map assets to a [GeoJsonFeatureCollection]
   GeoJsonFeatureCollection toGeoJsonFeatures() {
-    final featureCollection = GeoJsonFeatureCollection()
-      ..collection = <GeoJsonFeature>[];
+    final featureCollection = GeoJsonFeatureCollection(collection: []);
     final markersFeature = _markersState.toGeoJsonFeatures();
     final linesFeature = _linesState.toGeoJsonFeatures();
     final polygonsFeature = _polygonsState.toGeoJsonFeatures();

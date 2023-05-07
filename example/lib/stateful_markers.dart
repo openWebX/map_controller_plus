@@ -13,8 +13,10 @@ class Place {
 
 class _StatefulMarkersPageState extends State<StatefulMarkersPage> {
   final mapController = MapController();
-  late final statefulMapController =
-      StatefulMapController(mapController: mapController);
+
+  late final statefulMapController = StatefulMapController(
+    mapController: mapController,
+  );
   late final StreamSubscription<StatefulMapControllerStateChange> sub;
 
   final List<Place> places = [
@@ -84,7 +86,11 @@ class _StatefulMarkersPageState extends State<StatefulMarkersPage> {
             zoom: 11.0,
           ),
           children: [
-            statefulMapController.tileLayer!,
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              subdomains: const ['a', 'b', 'c'],
+              userAgentPackageName: 'dev.fleaflet.flutter_map.example',
+            ),
             MarkerLayer(
                 markers: statefulMapController
                     .getMarkers(['Notre-Dame', 'Montmartre'])),
